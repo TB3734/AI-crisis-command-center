@@ -1,0 +1,29 @@
+
+# Python virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Database credentials and secrets
+.env
+.env.*
+!.env.example
+
+# React dependencies
+node_modules/
+
+# Build files
+dist/
+build/
+
+# Logs
+*.log
+
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db
