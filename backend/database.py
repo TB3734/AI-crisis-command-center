@@ -34,3 +34,10 @@ def check_database():
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
     return True
+
+
+from models import Base, Incident
+
+
+def create_tables():
+    Base.metadata.create_all(bind=engine)

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import "./App.css";
+import IncidentForm from "./IncidentForm";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -17,6 +18,8 @@ function App() {
   const [backend, setBackend] = useState("Checking...");
   const [database, setDatabase] = useState("Checking...");
   const [incidents, setIncidents] = useState([]);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [statusError, setStatusError] = useState("");
 
   useEffect(() => {
     async function loadDashboard() {
@@ -64,23 +67,85 @@ function App() {
     loadDashboard();
   }, []);
 
-  const stats = [
-    {
-      title: "Total Incidents",
-      value: incidents.length,
-      icon: AlertTriangle
-    },
-    {
-      title: "Active Emergencies",
-      value: 0,
-      icon: Activity
-    },
-    {
-      title: "Units Dispatched",
-      value: 0,
-      icon: Truck
+
+async function updateIncidentStatus(incident) {
+  const nextStatus = {
+    Reported: "Units Dispatched",
+    "Units Dispatched": "Reached",
+    Reached: "Under Control"
+  }[incident.status];
+
+  if (!nextStatus) return;
+
+  setUpdatingId(incident.id);
+  setStatusError("");
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/incidents/${incident.id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ status: nextStatus })
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.detail || "Failed to update incident"
+      );
     }
-  ];
+
+    setIncidents((previous) =>
+      previous.map((item) =>
+        item.id === incident.id
+          ? { ...item, status: nextStatus }
+          : item
+      )
+    );
+
+  } catch (error) {
+    setStatusError(error.message);
+  } finally {
+    setUpdatingId(null);
+  }
+}
+
+
+  
+const totalIncidents = incidents.length;
+
+const activeEmergencies = incidents.filter(
+  (incident) => incident.status !== "Under Control"
+).length;
+
+const dispatchedIncidents = incidents.filter(
+  (incident) =>
+    incident.status === "Units Dispatched" ||
+    incident.status === "Reached"
+).length;
+
+const stats = [
+  {
+    title: "Total Incidents",
+    value: totalIncidents,
+    icon: AlertTriangle
+  },
+  {
+    title: "Active Emergencies",
+    value: activeEmergencies,
+    icon: Activity
+  },
+  {
+    title: "Dispatches in Progress",
+    value: dispatchedIncidents,
+    icon: Truck
+  }
+];
+
 
   return (
     <div className="app">
@@ -150,17 +215,86 @@ function App() {
           </div>
         </section>
 
-        <section className="panel">
-          <h2>Recent Incidents</h2>
+        <IncidentForm
+          onIncidentCreated={() => window.location.reload()}
+        />
 
-          <div className="empty-state">
-            <AlertTriangle size={30} />
-            <p>No incidents reported yet.</p>
-            <small>
-              Incident reporting will be added in Phase 2.
-            </small>
-          </div>
-        </section>
+        
+<section className="panel">
+  <h2>Recent Incidents</h2>
+  {statusError && (
+  <p className="form-error" role="alert">
+    {statusError}
+  </p>
+)}
+
+  {incidents.length === 0 ? (
+    <div className="empty-state">
+      <AlertTriangle size={30} />
+      <p>No incidents reported yet.</p>
+    </div>
+  ) : (
+    <div className="table-container">
+      <table className="incident-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Disaster</th>
+            <th>Location</th>
+            <th>Severity</th>
+            <th>Status</th>
+            <th>Reported At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {incidents.map((incident) => (
+            <tr key={incident.id}>
+              <td>#{incident.id}</td>
+              <td>{incident.disaster_type}</td>
+              <td>{incident.location}</td>
+              <td>
+                <span
+                  className={`severity severity-${incident.severity}`}
+                >
+                  Level {incident.severity}
+                </span>
+              </td>
+              <td>{incident.status}</td>
+              <td>
+
+            <td>
+              <button
+                className="status-button"
+                disabled={
+                  updatingId === incident.id ||
+                  incident.status === "Under Control"
+                }
+                onClick={() => updateIncidentStatus(incident)}
+              >
+                {updatingId === incident.id
+                  ? "Updating..."
+                : {
+                    Reported: "Dispatch Units",
+                    "Units Dispatched": "Mark as Reached",
+                    Reached: "Mark Under Control",
+                    "Under Control": "Completed"
+                  }[incident.status] || "Unavailable"}
+              </button>
+            </td>
+
+                {new Date(incident.reported_at).toLocaleString()}
+              </td>
+              
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
+
       </main>
     </div>
   );
