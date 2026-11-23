@@ -18,3 +18,8 @@ class IncidentStatusUpdate(BaseModel):
         "Reached",
         "Under Control"
     ]
+
+
+class IncidentAnalysisRequest(BaseModel):
+    location: str = Field(min_length=3, max_length=255)
+    description: str = Field(min_length=5)

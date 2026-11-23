@@ -4,7 +4,19 @@ from sqlalchemy.orm import Session
 
 from database import engine
 from models import Incident
-from schemas import IncidentCreate, IncidentStatusUpdate
+
+from schemas import (
+    IncidentCreate,
+    IncidentStatusUpdate,
+    IncidentAnalysisRequest
+)
+
+from ai_engine import (
+    classify_disaster,
+    predict_severity,
+    detect_duplicate
+)
+
 
 
 from fastapi import FastAPI, HTTPException
@@ -162,4 +174,42 @@ def update_incident_status(
             "id": incident.id,
             "status": incident.status
         }
+    }
+
+@app.post("/api/analyze-incident")
+def analyze_incident(
+    report: IncidentAnalysisRequest,
+    db: Session = Depends(get_db)
+):
+    # Classify disaster type
+    classification = classify_disaster(
+        report.description
+    )
+
+    # Predict severity
+    severity = predict_severity(
+        report.description
+    )
+
+    # Retrieve existing incidents
+    existing_incidents = db.query(Incident).all()
+
+    # Detect potential duplicates
+    duplicates = detect_duplicate(
+        disaster_type=classification["disaster_type"],
+        location=report.location,
+        description=report.description,
+        existing_incidents=existing_incidents
+    )
+
+    # Return analysis results
+    return {
+        "classification": classification,
+        "severity_prediction": severity,
+        "duplicate_detection": duplicates,
+        "requires_manual_review": (
+            classification["disaster_type"] == "Unknown"
+            or duplicates["is_potential_duplicate"]
+            or severity["severity"] == 3
+        )
     }
